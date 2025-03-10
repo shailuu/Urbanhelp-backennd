@@ -1,5 +1,22 @@
 const Service = require("../models/service");
 
+// Get a specific service by ID
+exports.getServiceById = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        const service = await Service.findById(id);
+
+        if (!service) {
+            return res.status(404).json({ message: "Service not found" });
+        }
+
+        res.status(200).json(service);
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching service", error });
+    }
+};
+
 // Get all services
 exports.getAllServices = async (req, res) => {
     try {
