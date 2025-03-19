@@ -1,3 +1,5 @@
+// controllers/auth-controller.js
+
 const User = require("../models/user-models");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -14,7 +16,6 @@ const home = async (req, res, next) => {
 // Registration Logic
 const register = async (req, res, next) => {
     try {
-        console.log(req.body);
         const { username, email, password } = req.body;
 
         // Check if user already exists
@@ -22,10 +23,10 @@ const register = async (req, res, next) => {
         if (userExist) {
             const error = new Error("Email already exists");
             error.status = 400;
-            return next(error); // Pass error to middleware
+            return next(error);
         }
 
-        // Create new user (DO NOT hash password here, as `pre("save")` already does it)
+        // Create new user
         const userCreated = await User.create({
             username,
             email,
@@ -39,14 +40,19 @@ const register = async (req, res, next) => {
             { expiresIn: "70d" }
         );
 
-        res.status(201).json({ 
-            msg: "Registration Successful!", 
-            token, 
-            userID: userCreated._id.toString(),
+        res.status(201).json({
+            msg: "Registration Successful!",
+            token,
+            user: {
+                id: userCreated._id.toString(),
+                username: userCreated.username,
+                email: userCreated.email,
+                isAdmin: userCreated.isAdmin,
+            },
         });
 
     } catch (error) {
-        next(error); // Pass error to middleware
+        next(error);
     }
 };
 
@@ -54,28 +60,23 @@ const register = async (req, res, next) => {
 const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
-        
-        console.log("Login Attempt:", email);
 
         // Find user by email
         const userExist = await User.findOne({ email });
 
-        if (!userExist) {    
+        if (!userExist) {
             const error = new Error("Invalid email or password");
             error.status = 400;
-            return next(error); // Pass error to middleware
+            return next(error);
         }
-
-        console.log("User Found:", userExist);
 
         // Compare passwords
         const isPasswordCorrect = await bcrypt.compare(password, userExist.password);
-        console.log("Password Match:", isPasswordCorrect);
 
         if (!isPasswordCorrect) {
             const error = new Error("Invalid email or password");
             error.status = 401;
-            return next(error); // Pass error to middleware
+            return next(error);
         }
 
         // Generate JWT token
@@ -84,11 +85,16 @@ const login = async (req, res, next) => {
         res.status(200).json({
             msg: "Login Successful",
             token,
-            userID: userExist._id.toString(),
+            user: {
+                id: userExist._id.toString(),
+                username: userExist.username,
+                email: userExist.email,
+                isAdmin: userExist.isAdmin,
+            },
         });
 
     } catch (error) {
-        next(error); // Pass error to middleware
+        next(error);
     }
 };
 

@@ -1,6 +1,8 @@
+// router/auth-router.js
+
 const express = require("express");
 const router = express.Router();
-const authControllers = require("../controllers/auth-controller"); // Correct the import here
+const authControllers = require("../controllers/auth-controller");
 const { signupSchema, loginSchema } = require("../validator/auth-validators");
 const validate = require("../middlewares/validate-middleware");
 
@@ -8,11 +10,9 @@ const validate = require("../middlewares/validate-middleware");
 router.route("/").get(authControllers.home);
 
 // Register route
-router.route("/register")
-  .post(validate(signupSchema), authControllers.register);
+router.route("/register").post(validate(signupSchema), authControllers.register);
 
 // Login route
-router.route("/login")
-  .post(validate(loginSchema), authControllers.login);
+router.route("/login").post(validate(loginSchema), authControllers.login);
 
 module.exports = router;
