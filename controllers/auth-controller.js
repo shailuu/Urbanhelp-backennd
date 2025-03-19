@@ -1,5 +1,3 @@
-// controllers/auth-controller.js
-
 const User = require("../models/user-models");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
@@ -98,4 +96,43 @@ const login = async (req, res, next) => {
     }
 };
 
-module.exports = { home, register, login };
+// Fetch User Profile
+const getProfile = async (req, res, next) => {
+    try {
+        const user = req.user; // User attached by authMiddleware
+        res.status(200).json({
+            username: user.username,
+            email: user.email,
+            dob: user.dob,
+            gender: user.gender,
+            city: user.city,
+            phoneNumber: user.phoneNumber,
+            address: user.address,
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Update User Profile
+const updateProfile = async (req, res, next) => {
+    try {
+        const user = req.user; // User attached by authMiddleware
+        const updates = req.body;
+
+        // Update user fields
+        user.dob = updates.dob || user.dob;
+        user.gender = updates.gender || user.gender;
+        user.city = updates.city || user.city;
+        user.phoneNumber = updates.phoneNumber || user.phoneNumber;
+        user.address = updates.address || user.address;
+
+        await user.save(); // Save updated user data
+
+        res.status(200).json({ message: "Profile updated successfully." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { home, register, login, getProfile, updateProfile };
