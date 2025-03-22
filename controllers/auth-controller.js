@@ -24,7 +24,7 @@ const register = async (req, res, next) => {
             return next(error);
         }
 
-        // Create new user
+        // Create new user with minimal required fields
         const userCreated = await User.create({
             username,
             email,
@@ -32,11 +32,7 @@ const register = async (req, res, next) => {
         });
 
         // Generate JWT token
-        const token = jwt.sign(
-            { userId: userCreated._id },
-            process.env.JWT_SECRET_KEY,
-            { expiresIn: "70d" }
-        );
+        const token = await userCreated.generateToken();
 
         res.status(201).json({
             msg: "Registration Successful!",
@@ -100,14 +96,15 @@ const login = async (req, res, next) => {
 const getProfile = async (req, res, next) => {
     try {
         const user = req.user; // User attached by authMiddleware
+        
         res.status(200).json({
             username: user.username,
             email: user.email,
-            dob: user.dob,
-            gender: user.gender,
-            city: user.city,
-            phoneNumber: user.phoneNumber,
-            address: user.address,
+            dob: user.dob || "",
+            gender: user.gender || "",
+            city: user.city || "",
+            phoneNumber: user.phoneNumber || "",
+            address: user.address || "",
         });
     } catch (error) {
         next(error);
@@ -119,17 +116,31 @@ const updateProfile = async (req, res, next) => {
     try {
         const user = req.user; // User attached by authMiddleware
         const updates = req.body;
-
-        // Update user fields
-        user.dob = updates.dob || user.dob;
-        user.gender = updates.gender || user.gender;
-        user.city = updates.city || user.city;
-        user.phoneNumber = updates.phoneNumber || user.phoneNumber;
-        user.address = updates.address || user.address;
+        
+        // List of fields that can be updated
+        const allowedUpdates = ["username", "dob", "gender", "city", "phoneNumber", "address"];
+        
+        // Update fields if provided in request
+        allowedUpdates.forEach(field => {
+            if (updates[field] !== undefined) {
+                user[field] = updates[field];
+            }
+        });
 
         await user.save(); // Save updated user data
 
-        res.status(200).json({ message: "Profile updated successfully." });
+        res.status(200).json({ 
+            message: "Profile updated successfully.",
+            user: {
+                username: user.username,
+                email: user.email,
+                dob: user.dob || "",
+                gender: user.gender || "",
+                city: user.city || "",
+                phoneNumber: user.phoneNumber || "",
+                address: user.address || "",
+            }
+        });
     } catch (error) {
         next(error);
     }
