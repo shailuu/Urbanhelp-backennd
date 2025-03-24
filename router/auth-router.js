@@ -12,6 +12,12 @@ router.route("/").get(authControllers.home);
 // Register route
 router.route("/register").post(validate(signupSchema), authControllers.register);
 
+// Verify OTP route (no middleware required since it's part of registration)
+router.route("/verify-otp").post(authControllers.verifyOTP);
+
+// Resend OTP route
+router.route("/resend-otp").post(authControllers.resendOTP);
+
 // Login route
 router.route("/login").post(validate(loginSchema), authControllers.login);
 
