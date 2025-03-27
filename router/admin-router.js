@@ -1,15 +1,20 @@
-const express = require("express");
+const express = require('express');
 const router = express.Router();
-const { authMiddleware, adminMiddleware } = require("../middlewares/auth-middleware");
+const adminController = require('../controllers/admin-controller');
+const adminAuthMiddleware = require('../middlewares/admin-auth');
 
-// Protected route for testing authentication
-router.get("/test-auth", authMiddleware, (req, res) => {
-    res.status(200).json({ success: true, message: "Authenticated successfully.", user: req.user });
-});
+// Apply admin auth middleware to all admin routes
+router.use(adminAuthMiddleware);
 
-// Protected route for testing admin authorization
-router.get("/test-admin", authMiddleware, adminMiddleware, (req, res) => {
-    res.status(200).json({ success: true, message: "Admin access granted.", user: req.user });
-});
+// Generic resource routes
+router.get('/:resource', adminController.listResources);
+router.get('/:resource/:id', adminController.getResource);
+router.post('/:resource', adminController.createResource);
+router.put('/:resource/:id', adminController.updateResource);
+router.delete('/:resource/:id', adminController.deleteResource);
+
+// Custom admin routes
+router.get('/stats', adminController.getStats);
+router.post('/users/:id/toggle-admin', adminController.toggleAdminStatus);
 
 module.exports = router;

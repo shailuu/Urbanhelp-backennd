@@ -20,4 +20,7 @@ const serviceSchema = new mongoose.Schema(
     { timestamps: true }
 );
 
-module.exports = mongoose.model("Service", serviceSchema); // ✅ Correct export
+// Define the model
+const Service = mongoose.model("Service", serviceSchema);
+
+module.exports = Service;

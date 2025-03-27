@@ -11,10 +11,10 @@ function generateOTP(length = 6) {
 // Function to send OTP via email
 async function sendOTPEmail(email, otp) {
     const transporter = nodemailer.createTransport({
-        service: "Gmail", // Use your email service (e.g., Gmail, SendGrid)
+        service: "Gmail",
         auth: {
-            user: process.env.EMAIL_USER, // Your email address
-            pass: process.env.EMAIL_PASSWORD, // Your email password or app-specific password
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASSWORD,
         },
     });
 
@@ -44,7 +44,22 @@ const home = async (req, res, next) => {
     try {
         res.status(200).send("Welcome to UrbanHelp using controller");
     } catch (error) {
-        next(error); // Pass error to middleware
+        next(error);
+    }
+};
+
+// Fetch All Users (Admin Only)
+const getAllUsers = async (req, res, next) => {
+    try {
+        if (!req.user || !req.user.isAdmin) {
+            return res.status(403).json({ message: "Access denied. Admins only." });
+        }
+
+        const users = await User.find({}, "-password");
+        res.status(200).json(users);
+    } catch (error) {
+        console.error("Error fetching users:", error);
+        res.status(500).json({ message: "Failed to fetch users" });
     }
 };
 
@@ -52,50 +67,35 @@ const home = async (req, res, next) => {
 const register = async (req, res, next) => {
     try {
         const { username, email, password } = req.body;
-
-        // Check if user already exists
         const userExist = await User.findOne({ email });
+
         if (userExist) {
-            // If user exists but is not verified, we can resend OTP
             if (!userExist.isVerified) {
-                // Generate new OTP
                 const otp = generateOTP();
-                const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // OTP expires in 10 minutes
-                
-                // Update existing user with new OTP
                 userExist.otp = otp;
-                userExist.otpExpiresAt = otpExpiresAt;
+                userExist.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
                 await userExist.save();
-                
-                // Send OTP to email
                 await sendOTPEmail(email, otp);
-                
+
                 return res.status(200).json({
                     msg: "Account exists but not verified. New OTP sent to your email.",
                     requiresVerification: true
                 });
             } else {
-                const error = new Error("Email already exists");
-                error.status = 400;
-                return next(error);
+                return next(new Error("Email already exists"));
             }
         }
 
-        // Generate OTP for new user
         const otp = generateOTP();
-        const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // OTP expires in 10 minutes
-
-        // Create new user with OTP details
         const userCreated = await User.create({
             username,
             email,
-            password, // Password will be hashed automatically by userSchema.pre("save")
+            password,
             otp,
-            otpExpiresAt,
-            isVerified: false, // Mark as not verified initially
+            otpExpiresAt: new Date(Date.now() + 10 * 60 * 1000),
+            isVerified: false,
         });
 
-        // Send OTP to the user's email
         await sendOTPEmail(email, otp);
 
         res.status(201).json({
@@ -107,33 +107,21 @@ const register = async (req, res, next) => {
     }
 };
 
-// Verify OTP Logic
+// Verify OTP
 const verifyOTP = async (req, res, next) => {
     try {
         const { email, otp } = req.body;
-
-        // Find the user by email
         const user = await User.findOne({ email });
-        if (!user) {
-            const error = new Error("User not found");
-            error.status = 404;
-            return next(error);
+
+        if (!user || user.otp !== otp || user.otpExpiresAt < new Date()) {
+            return next(new Error("Invalid or expired OTP"));
         }
 
-        // Check if OTP matches and has not expired
-        if (user.otp !== otp || user.otpExpiresAt < new Date()) {
-            const error = new Error("Invalid or expired OTP");
-            error.status = 400;
-            return next(error);
-        }
-
-        // Mark the user as verified
         user.isVerified = true;
-        user.otp = undefined; // Clear OTP after verification
-        user.otpExpiresAt = undefined; // Clear OTP expiration time
+        user.otp = undefined;
+        user.otpExpiresAt = undefined;
         await user.save();
 
-        // Generate token for automatic login after verification
         const token = await user.generateToken();
 
         res.status(200).json({
@@ -152,87 +140,50 @@ const verifyOTP = async (req, res, next) => {
     }
 };
 
-// Resend OTP Logic
+// Resend OTP
 const resendOTP = async (req, res, next) => {
     try {
         const { email } = req.body;
-
-        // Find the user by email
         const user = await User.findOne({ email });
-        if (!user) {
-            const error = new Error("User not found");
-            error.status = 404;
-            return next(error);
-        }
 
-        // Check if the user is already verified
-        if (user.isVerified) {
-            return res.status(400).json({
-                msg: "User is already verified. Please log in."
-            });
-        }
+        if (!user) return next(new Error("User not found"));
+        if (user.isVerified) return res.status(400).json({ msg: "User is already verified. Please log in." });
 
-        // Generate new OTP
         const otp = generateOTP();
-        const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // OTP expires in 10 minutes
-
-        // Update user with new OTP
         user.otp = otp;
-        user.otpExpiresAt = otpExpiresAt;
+        user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
         await user.save();
-
-        // Send new OTP to the user's email
         await sendOTPEmail(email, otp);
 
-        res.status(200).json({
-            msg: "New OTP sent to your email.",
-        });
+        res.status(200).json({ msg: "New OTP sent to your email." });
     } catch (error) {
         next(error);
     }
 };
 
-// User Login Logic
+// User Login
 const login = async (req, res, next) => {
     try {
         const { email, password } = req.body;
-
-        // Find user by email
         const user = await User.findOne({ email });
-        if (!user) {
-            const error = new Error("Invalid email or password");
-            error.status = 400;
-            return next(error);
+
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            return next(new Error("Invalid email or password"));
         }
 
-        // Check if the user's email is verified
         if (!user.isVerified) {
-            // Generate new OTP for convenience
             const otp = generateOTP();
-            const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
-            
             user.otp = otp;
-            user.otpExpiresAt = otpExpiresAt;
+            user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
             await user.save();
-            
-            // Send new OTP
             await sendOTPEmail(email, otp);
-            
+
             return res.status(403).json({
                 msg: "Email not verified. A new verification code has been sent to your email.",
                 requiresVerification: true
             });
         }
 
-        // Compare passwords
-        const isPasswordCorrect = await bcrypt.compare(password, user.password);
-        if (!isPasswordCorrect) {
-            const error = new Error("Invalid email or password");
-            error.status = 401;
-            return next(error);
-        }
-
-        // Generate JWT token
         const token = await user.generateToken();
 
         res.status(200).json({
@@ -253,8 +204,7 @@ const login = async (req, res, next) => {
 // Fetch User Profile
 const getProfile = async (req, res, next) => {
     try {
-        const user = req.user; // User attached by authMiddleware
-        
+        const user = req.user;
         res.status(200).json({
             username: user.username,
             email: user.email,
@@ -272,38 +222,23 @@ const getProfile = async (req, res, next) => {
 // Update User Profile
 const updateProfile = async (req, res, next) => {
     try {
-        const user = req.user; // User attached by authMiddleware
+        const user = req.user;
         const updates = req.body;
-        
-        // List of fields that can be updated
         const allowedUpdates = ["username", "dob", "gender", "city", "phoneNumber", "address"];
-        
-        // Update fields if provided in request
+
         allowedUpdates.forEach(field => {
             if (updates[field] !== undefined) {
                 user[field] = updates[field];
             }
         });
 
-        await user.save(); // Save updated user data
-
-        res.status(200).json({ 
-            message: "Profile updated successfully.",
-            user: {
-                username: user.username,
-                email: user.email,
-                dob: user.dob || "",
-                gender: user.gender || "",
-                city: user.city || "",
-                phoneNumber: user.phoneNumber || "",
-                address: user.address || "",
-            }
-        });
+        await user.save();
+        res.status(200).json({ message: "Profile updated successfully.", user });
     } catch (error) {
         next(error);
     }
 };
 
 module.exports = { 
-    home, register, login, getProfile, updateProfile, verifyOTP, resendOTP 
+    home, register, login, getProfile, updateProfile, verifyOTP, resendOTP, getAllUsers
 };

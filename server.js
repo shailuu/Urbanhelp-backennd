@@ -1,5 +1,3 @@
-// app.js
-
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
@@ -13,6 +11,7 @@ const contactRoute = require("./router/contact-router");
 const workwithusRoute = require("./router/workwithus-router");
 const servicesRoute = require("./router/services-router");
 const adminRoute = require("./router/admin-router");
+const bookingRoute = require("./router/booking-router"); // Add the new booking router
 
 // Middleware
 app.use(cors({
@@ -24,9 +23,10 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoute);
 app.use("/api/form", contactRoute);
-app.use("/api/form", workwithusRoute);
+app.use("/api/form/workwithus", workwithusRoute);
 app.use("/api/services", servicesRoute);
 app.use("/api/admin", adminRoute);
+app.use("/api/bookings", bookingRoute); // Register the booking router
 
 // Error handling middleware
 app.use(errorMiddleware);

@@ -24,5 +24,5 @@ router.route("/login").post(validate(loginSchema), authControllers.login);
 // Profile routes (protected)
 router.route("/profile").get(authMiddleware, authControllers.getProfile); // Fetch user profile
 router.route("/profile").put(authMiddleware, validate(profileUpdateSchema), authControllers.updateProfile); // Update user profile
-
+router.route("/users").get(authMiddleware, authControllers.getAllUsers);
 module.exports = router;

@@ -8,6 +8,6 @@ const workWithUsSchema = new Schema({
     skills: { type: String, required: true },
     experience: { type: String, required: true },
 }, { timestamps: true }); // Adds createdAt and updatedAt timestamps
-
+{ collection: "workwithus" }
 const WorkWithUs = model("WorkWithUs", workWithUsSchema);
 module.exports = WorkWithUs;
