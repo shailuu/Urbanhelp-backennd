@@ -10,13 +10,14 @@ const authRoute = require("./router/auth-router");
 const contactRoute = require("./router/contact-router");
 const workwithusRoute = require("./router/workwithus-router");
 const servicesRoute = require("./router/services-router");
+const bookingRoute = require("./router/booking-router");
 const adminRoute = require("./router/admin-router");
-const bookingRoute = require("./router/booking-router"); // Add the new booking router
 
 // Middleware
 app.use(cors({
-    origin: "http://localhost:3000", // Replace with your frontend URL if needed
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "DELETE"],
+    credentials: true
 }));
 app.use(express.json());
 
@@ -26,13 +27,18 @@ app.use("/api/form", contactRoute);
 app.use("/api/form/workwithus", workwithusRoute);
 app.use("/api/services", servicesRoute);
 app.use("/api/admin", adminRoute);
-app.use("/api/bookings", bookingRoute); // Register the booking router
+app.use("/api/bookings", bookingRoute);
+
+// 404 handler
+app.use('*', (req, res) => {
+    res.status(404).json({ message: "Route not found" });
+});
 
 // Error handling middleware
 app.use(errorMiddleware);
 
 // Start server
-const PORT = 5001;
+const PORT = process.env.PORT || 5001;
 connectDB().then(() => {
     app.listen(PORT, () => {
         console.log(`Server is running at port: ${PORT}`);

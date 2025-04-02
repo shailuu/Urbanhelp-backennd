@@ -1,20 +1,26 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const adminController = require('../controllers/admin-controller');
-const adminAuthMiddleware = require('../middlewares/admin-auth');
+const { authMiddleware, isAdmin } = require("../middlewares/auth-middleware");
 
-// Apply admin auth middleware to all admin routes
-router.use(adminAuthMiddleware);
+const { 
+    getUsers, updateUser, deleteUser, 
+    getContacts, updateContact, deleteContact, 
+    getWorkWithUs, updateWorkWithUs, deleteWorkWithUs 
+} = require("../controllers/admin-controller");
 
-// Generic resource routes
-router.get('/:resource', adminController.listResources);
-router.get('/:resource/:id', adminController.getResource);
-router.post('/:resource', adminController.createResource);
-router.put('/:resource/:id', adminController.updateResource);
-router.delete('/:resource/:id', adminController.deleteResource);
+// User Management
+router.get("/users", authMiddleware, isAdmin, getUsers);
+router.put("/users/:id", authMiddleware, isAdmin, updateUser);
+router.delete("/users/:id", authMiddleware, isAdmin, deleteUser);
 
-// Custom admin routes
-router.get('/stats', adminController.getStats);
-router.post('/users/:id/toggle-admin', adminController.toggleAdminStatus);
+// Contact Management
+router.get("/contacts", authMiddleware, isAdmin, getContacts);
+router.put("/contacts/:id", authMiddleware, isAdmin, updateContact);
+router.delete("/contacts/:id", authMiddleware, isAdmin, deleteContact);
+
+// WorkWithUs Applications
+router.get("/workwithus", authMiddleware, isAdmin, getWorkWithUs);
+router.put("/workwithus/:id", authMiddleware, isAdmin, updateWorkWithUs);
+router.delete("/workwithus/:id", authMiddleware, isAdmin, deleteWorkWithUs);
 
 module.exports = router;

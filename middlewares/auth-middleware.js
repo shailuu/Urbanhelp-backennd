@@ -2,43 +2,49 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/user-models");
 
 // Middleware to authenticate users
-exports.authMiddleware = async (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1]; // Extract token from headers
+    const token = req.headers.authorization?.split(" ")[1]; // Extract token
 
     if (!token) {
       return res.status(401).json({ success: false, message: "Access denied. No token provided." });
     }
 
-    // Verify the token
+    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET_KEY);
 
-    // Find the user in the database
-    const user = await User.findById(decoded.userID).select("-password"); // Exclude password for security
+    // Find user in the database
+    const user = await User.findById(decoded.userID || decoded._id).select("-password");
 
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid token. User not found." });
     }
 
-    // Attach the user object to the request
+    // Attach user to request
     req.user = user;
     next();
   } catch (error) {
-    // Handle token verification errors
     return res.status(401).json({ success: false, message: "Invalid token." });
   }
 };
 
-// Middleware to check if the user is an admin
-exports.adminMiddleware = (req, res, next) => {
+// Middleware to check if user is admin
+const isAdmin = async (req, res, next) => {
   try {
-    // Check if the user has the 'admin' role
-    if (req.user.role !== "admin") {
-      return res.status(403).json({ success: false, message: "Access denied. Not an admin." });
+    // Ensure user exists
+    if (!req.user) {
+      return res.status(403).json({ error: "Access denied. User not authenticated." });
+    }
+
+    // We already have the user from authMiddleware
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ error: "Access denied. Not an admin." });
     }
 
     next();
   } catch (error) {
-    return res.status(500).json({ success: false, message: "Server error." });
+    res.status(500).json({ error: "Authorization failed" });
   }
 };
+
+module.exports = { authMiddleware, isAdmin };
