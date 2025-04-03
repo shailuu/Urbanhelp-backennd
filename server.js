@@ -13,6 +13,11 @@ const servicesRoute = require("./router/services-router");
 const bookingRoute = require("./router/booking-router");
 const adminRoute = require("./router/admin-router");
 
+// Import review router
+const reviewRoute = require("./router/review-router");
+
+// Use review routes
+
 // Middleware
 app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
@@ -28,6 +33,7 @@ app.use("/api/form/workwithus", workwithusRoute);
 app.use("/api/services", servicesRoute);
 app.use("/api/admin", adminRoute);
 app.use("/api/bookings", bookingRoute);
+app.use("/api", reviewRoute);
 
 // 404 handler
 app.use('*', (req, res) => {
