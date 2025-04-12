@@ -1,6 +1,13 @@
 const User = require("../models/user-models");
 const Contact = require("../models/contact-model");
 const WorkWithUs = require("../models/workwithus-model");
+const Service = require("../models/service");
+const { approveWorker } = require("./workwithus-controller"); // <-- Import the approveWorker function
+const ApprovedWorker = require('../models/approvedWorker-model');
+const Booking = require("../models/booking-model");
+const ApprovedBooking = require("../models/approvedBooking-model");
+const { approveBooking } = require("./booking-controller");
+
 
 // Get all users
 const getUsers = async (req, res) => {
@@ -110,6 +117,185 @@ const deleteWorkWithUs = async (req, res) => {
   }
 };
 
+// Get all services
+const getServices = async (req, res) => {
+  try {
+    const services = await Service.find();
+    res.status(200).json(services);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch services" });
+  }
+};
+
+// Create a new service
+const createService = async (req, res) => {
+  try {
+    const { title, description, image, additionalDetails, durations } = req.body;
+
+    // Validate durations array
+    if (!Array.isArray(durations) || durations.length === 0) {
+      return res.status(400).json({ error: "Durations must be a non-empty array" });
+    }
+
+    // Validate that each duration object has the required properties
+    for (const item of durations) {
+      if (!item.duration || !item.charge) {
+        return res.status(400).json({ error: "Each duration must have both duration and charge properties" });
+      }
+    }
+
+    const newService = new Service({
+      title,
+      description,
+      image,
+      additionalDetails,
+      durations
+    });
+
+    await newService.save();
+    res.status(201).json(newService);
+  } catch (error) {
+    console.error(error); // Log the error for debugging
+    res.status(500).json({ error: "Failed to create service" });
+  }
+};
+
+// Update a service
+const updateService = async (req, res) => {
+  try {
+    const service = await Service.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    if (!service) {
+      return res.status(404).json({ error: "Service not found" });
+    }
+    res.status(200).json(service);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update service" });
+  }
+};
+
+// Delete a service
+const deleteService = async (req, res) => {
+  try {
+    const service = await Service.findByIdAndDelete(req.params.id);
+    if (!service) {
+      return res.status(404).json({ error: "Service not found" });
+    }
+    res.status(200).json({ message: "Service deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete service" });
+  }
+};
+
+const getApprovedWorkers = async (req, res) => {
+  try {
+    const workers = await ApprovedWorker.find();
+    res.status(200).json(workers);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch approved workers" });
+  }
+};
+
+
+// Add these new controller functions:
+
+// Create approved worker directly (not from application)
+const createApprovedWorker = async (req, res) => {
+  try {
+    const worker = new ApprovedWorker(req.body);
+    await worker.save();
+    res.status(201).json(worker);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to create approved worker" });
+  }
+};
+
+// Update approved worker
+const updateApprovedWorker = async (req, res) => {
+  try {
+    const worker = await ApprovedWorker.findByIdAndUpdate(
+      req.params.id, 
+      req.body, 
+      { new: true }
+    );
+    if (!worker) {
+      return res.status(404).json({ error: "Approved worker not found" });
+    }
+    res.status(200).json(worker);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to update approved worker" });
+  }
+};
+
+// Delete approved worker
+const deleteApprovedWorker = async (req, res) => {
+  try {
+    const worker = await ApprovedWorker.findByIdAndDelete(req.params.id);
+    if (!worker) {
+      return res.status(404).json({ error: "Approved worker not found" });
+    }
+    res.status(200).json({ message: "Approved worker deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete approved worker" });
+  }
+};
+
+const getAllBookingsAdmin = async (req, res) => {
+  try {
+    const bookings = await Booking.find({})
+      .populate("service", "title description price")
+      .populate("approvedWorker", "name email phone")
+      .sort({ createdAt: -1 });
+      
+    return res.status(200).json({
+      success: true,
+      count: bookings.length,
+      bookings
+    });
+  } catch (error) {
+    console.error("[Get Bookings Error]:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve bookings",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
+  }
+};
+
+// Get all approved bookings for admin
+const getApprovedBookingsAdmin = async (req, res) => {
+  try {
+    const approvedBookings = await ApprovedBooking.find({})
+      .populate("service", "title description price")
+      .populate("approvedWorker", "name email phone")
+      .sort({ finalizedAt: -1 });
+      
+    return res.status(200).json({
+      success: true,
+      count: approvedBookings.length,
+      approvedBookings
+    });
+  } catch (error) {
+    console.error("[Get Approved Bookings Error]:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to retrieve approved bookings",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
+    });
+  }
+};
+
+const deleteBooking = async (req, res) => {
+  try {
+    const booking = await Booking.findByIdAndDelete(req.params.id);
+    if (!booking) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+    res.status(200).json({ message: "Booking deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Failed to delete booking" });
+  }
+};
+// Export all functions including approveWorker
 module.exports = { 
   getUsers, 
   updateUser, 
@@ -119,5 +305,18 @@ module.exports = {
   deleteContact, 
   getWorkWithUs, 
   updateWorkWithUs, 
-  deleteWorkWithUs
+  deleteWorkWithUs, 
+  getServices, 
+  createService, 
+  updateService, 
+  deleteService,
+  approveWorker,
+  getApprovedWorkers, 
+  createApprovedWorker,
+  updateApprovedWorker,
+  deleteApprovedWorker,
+  getAllBookingsAdmin,
+  getApprovedBookingsAdmin,
+  approveBooking, 
+  deleteBooking
 };
