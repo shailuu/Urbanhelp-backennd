@@ -29,28 +29,42 @@ exports.getAllServices = async (req, res) => {
 
 // Add a new service
 exports.addService = async (req, res) => {
-    const { title, description, image } = req.body;
+    const { title, description } = req.body;
 
     try {
+        // Extract the image URL from the uploaded file
+        const image = req.file ? req.file.path : null;
+        if (!image) {
+            return res.status(400).json({ message: "Image is required" });
+        }
+
         const newService = new Service({ title, description, image });
         await newService.save();
+
         res.status(201).json({ message: "Service added successfully", service: newService });
     } catch (error) {
-        res.status(500).json({ message: "Error adding service", error: error.message});
+        console.error(error);
+        res.status(500).json({ message: "Error adding service", error: error.message });
     }
 };
 
 // Update a service by ID
 exports.updateService = async (req, res) => {
     const { id } = req.params;
-    const { title, description, image } = req.body;
+    const { title, description } = req.body;
 
     try {
-        const updatedService = await Service.findByIdAndUpdate(
-            id,
-            { title, description, image },
-            { new: true }
-        );
+        // Check if a new file is uploaded
+        const image = req.file ? req.file.path : undefined;
+
+        // Prepare the update object
+        const updateData = {
+            title,
+            description,
+            ...(image && { image }), // Only update the image if a new file is uploaded
+        };
+
+        const updatedService = await Service.findByIdAndUpdate(id, updateData, { new: true });
 
         if (!updatedService) {
             return res.status(404).json({ message: "Service not found" });
@@ -58,6 +72,7 @@ exports.updateService = async (req, res) => {
 
         res.status(200).json({ message: "Service updated successfully", service: updatedService });
     } catch (error) {
+        console.error(error);
         res.status(500).json({ message: "Error updating service", error });
     }
 };

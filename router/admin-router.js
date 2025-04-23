@@ -1,15 +1,15 @@
 const express = require("express");
 const router = express.Router();
+const parser = require('../middlewares/upload');
 const { authMiddleware, isAdmin } = require("../middlewares/auth-middleware");
 
 const { 
     getUsers, updateUser, deleteUser, 
     getContacts, updateContact, deleteContact, 
     getWorkWithUs, updateWorkWithUs, deleteWorkWithUs,
-    getServices, createService, updateService, deleteService,
+    getServices, addService, updateService, deleteService,
     approveWorker, getApprovedWorkers, createApprovedWorker,
     updateApprovedWorker, deleteApprovedWorker,
-    // Add these new imports
     getAllBookingsAdmin, 
     getApprovedBookingsAdmin,
     approveBooking,
@@ -38,13 +38,27 @@ router.delete("/approved-workers/:id", authMiddleware, isAdmin, deleteApprovedWo
 
 // Service Management
 router.get("/services", authMiddleware, isAdmin, getServices);
-router.post("/services", authMiddleware, isAdmin, createService);
-router.put("/services/:id", authMiddleware, isAdmin, updateService);
+// In your routes file
+router.post(
+    "/services", 
+    authMiddleware, 
+    isAdmin, 
+    parser.single('image'), // Ensure 'image' matches the field name in your form
+    addService
+  ); // Consolidated route
+router.put("/services/:id", authMiddleware, isAdmin, parser.single('image'), updateService); // Added parser middleware
 router.delete("/services/:id", authMiddleware, isAdmin, deleteService);
 
-// Add these new booking management routes
+// Booking Management
 router.get("/bookings", authMiddleware, isAdmin, getAllBookingsAdmin);
 router.get("/approved-bookings", authMiddleware, isAdmin, getApprovedBookingsAdmin);
 router.post("/bookings/:id/approve", authMiddleware, isAdmin, approveBooking);
 router.delete("/bookings/:id", authMiddleware, isAdmin, deleteBooking);
+
+// Error-handling middleware
+router.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ message: "Internal Server Error" });
+});
+
 module.exports = router;

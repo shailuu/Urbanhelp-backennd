@@ -2,6 +2,7 @@ const User = require("../models/user-models");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
+const { sendPasswordResetEmail } = require("../utils/sendEmail");
 
 // Utility function to generate OTP
 function generateOTP(length = 6) {
@@ -238,7 +239,118 @@ const updateProfile = async (req, res, next) => {
         next(error);
     }
 };
+// controllers/auth-controller.js (add this)
+
+// Update this in controllers/auth-controller.js
+const forgotPassword = async (req, res, next) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ message: "Email is required" });
+        }
+        
+        const user = await User.findOne({ email });
+
+        if (!user || !user.isVerified) {
+            // For security reasons, don't reveal if user exists or not
+            return res.status(200).json({ message: "If the email exists in our system, an OTP has been sent for password reset." });
+        }
+
+        const otp = generateOTP();
+        user.otp = otp;
+        user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        await user.save();
+
+        // Use the dedicated password reset email function
+        await sendPasswordResetEmail(email, otp);
+
+        res.status(200).json({ message: "OTP sent to your email for password reset." });
+    } catch (error) {
+        console.error("Forgot password error:", error);
+        res.status(500).json({ message: "Failed to process your request. Please try again later." });
+        next(error);
+    }
+};
+// controllers/auth-controller.js (add this)
+
+// Update this in controllers/auth-controller.js
+const resetPassword = async (req, res, next) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+        
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({ message: "Email, OTP, and new password are required." });
+        }
+        
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(400).json({ message: "Invalid request." });
+        }
+
+        if (user.otp !== otp) {
+            return res.status(400).json({ message: "Invalid OTP." });
+        }
+
+        if (user.otpExpiresAt < new Date()) {
+            return res.status(400).json({ message: "OTP has expired. Please request a new one." });
+        }
+
+        // Validate password strength (optional)
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: "Password must be at least 6 characters long." });
+        }
+
+        user.password = newPassword; // will be hashed in pre-save hook
+        user.otp = undefined;
+        user.otpExpiresAt = undefined;
+        await user.save();
+
+        res.status(200).json({ message: "Password reset successful. You can now log in." });
+    } catch (error) {
+        console.error("Reset password error:", error);
+        res.status(500).json({ message: "Failed to reset password. Please try again later." });
+        next(error);
+    }
+};
+
+// controllers/auth-controller.js
+
+const deleteAccount = async (req, res, next) => {
+    try {
+        const userId = req.user._id; // Extract user ID from the token (added by authMiddleware)
+        
+        // Find and delete the user
+        const deletedUser = await User.findByIdAndDelete(userId);
+        
+        if (!deletedUser) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        // Optionally, you can perform additional cleanup here (e.g., delete related data)
+
+        res.status(200).json({ message: "Account deleted successfully." });
+    } catch (error) {
+        console.error("Error deleting account:", error);
+        res.status(500).json({ message: "Failed to delete account. Please try again later." });
+        next(error);
+    }
+};
+
+
+
 
 module.exports = { 
-    home, register, login, getProfile, updateProfile, verifyOTP, resendOTP, getAllUsers
+    home,
+    register,
+    login,
+    getProfile,
+    updateProfile,
+    verifyOTP,
+    resendOTP,
+    getAllUsers,
+    forgotPassword,
+    resetPassword,
+    sendPasswordResetEmail ,
+    deleteAccount// Add this if you defined it in the controller file
 };

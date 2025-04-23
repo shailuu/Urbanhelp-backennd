@@ -25,4 +25,12 @@ router.route("/login").post(validate(loginSchema), authControllers.login);
 router.route("/profile").get(authMiddleware, authControllers.getProfile); // Fetch user profile
 router.route("/profile").put(authMiddleware, validate(profileUpdateSchema), authControllers.updateProfile); // Update user profile
 router.route("/users").get(authMiddleware, authControllers.getAllUsers);
+// routes/auth-router.js
+
+router.route("/forgot-password").post(authControllers.forgotPassword);
+router.route("/reset-password").post(authControllers.resetPassword);
+
+// Delete account route (protected)
+router.route("/delete-account").delete(authMiddleware, authControllers.deleteAccount);
+
 module.exports = router;
