@@ -3,7 +3,7 @@ const Booking = require("../models/booking-model");
 const ApprovedBooking = require("../models/approvedBooking-model");
 const ApprovedWorker = require("../models/approvedWorker-model");
 const Service = require("../models/service");
-const sendEmail = require("../utils/sendEmail");
+const { sendEmail } = require("../utils/sendEmail");
 const Notification = require("../models/notification-model");
 const { generateBookingApprovalEmail } = require("../utils/emailTemplates");
 

@@ -19,7 +19,7 @@ const getReviews = async (req, res) => {
 
 // Submit a new review for a specific service
 const createReview = async (req, res) => {
-    const { id } = req.params;
+    const { id } = req.params; // serviceId
     const { rating, comment } = req.body;
     const userId = req.user.id;
 
@@ -28,21 +28,48 @@ const createReview = async (req, res) => {
     }
 
     try {
+        // 🔍 Check if user has already reviewed this service
+        const existingReview = await Review.findOne({ serviceId: id, userId });
+
+        if (existingReview) {
+            return res.status(400).json({ message: "You have already reviewed this service." });
+        }
+
+        // 📝 Create new review
         const newReview = new Review({
             serviceId: id,
-            userId: userId,
-            rating: rating,
-            comment: comment,
+            userId,
+            rating,
+            comment,
         });
 
         const savedReview = await newReview.save();
 
         res.status(201).json(savedReview);
+
     } catch (error) {
+        // 💥 Handle MongoDB duplicate key error (in case of race condition)
+        if (error.code === 11000) {
+            return res.status(400).json({ message: "You have already reviewed this service." });
+        }
+
         console.error(error);
         res.status(500).json({ message: "Failed to submit review." });
     }
 };
 
-// Export only the controller functions
-module.exports = { getReviews, createReview };
+// ✅ Add this function:
+const checkUserReview = async (req, res) => {
+    const { id } = req.params; // serviceId
+    const userId = req.user.id;
+
+    try {
+        const existingReview = await Review.findOne({ serviceId: id, userId });
+        res.json({ hasReviewed: !!existingReview });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+module.exports = { getReviews, createReview, checkUserReview };

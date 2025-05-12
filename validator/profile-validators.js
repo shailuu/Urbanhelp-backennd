@@ -6,7 +6,11 @@ const profileUpdateSchema = z.object({
   dob: z.string().optional().nullable(),
   gender: z.enum(["Male", "Female", "Other"]).optional().nullable(),
   city: z.string().optional().nullable(),
-  phoneNumber: z.string().regex(/^[0-9]+$/).optional().nullable(),
+  phoneNumber: z
+    .string()
+    .regex(/^\d{10}$/, { message: "Phone number must be exactly 10 digits" })
+    .optional()
+    .nullable(),
   address: z.string().optional().nullable()
 });
 
