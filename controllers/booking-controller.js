@@ -208,9 +208,30 @@ const approveBooking = async (req, res) => {
     session.endSession();
   }
 };
+/**
+ * @desc    Get booking history for logged-in user (past bookings only)
+ * @route   GET /api/bookings/history/user
+ * @access  Private/User (user must be authenticated)
+ */
+const getUserBookingHistory = async (req, res) => {
+  try {
+    const userEmail = req.user.email;
+
+    // Query by nested clientInfo.email field
+    const bookings = await ApprovedBooking.find({ "clientInfo.email": userEmail });
+
+    return res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Error fetching booking history:", error);
+    return res.status(500).json({ message: "Server error" });
+  }
+};
+
+
 
 module.exports = {
   createBooking,
   getAllBookings,
   approveBooking,
+  getUserBookingHistory
 };

@@ -8,6 +8,7 @@ const Booking = require("../models/booking-model");
 const ApprovedBooking = require("../models/approvedBooking-model");
 const { approveBooking } = require("./booking-controller");
 const parser = require("../middlewares/upload"); 
+const Review = require("../models/reviews");
 // ------------------- USER MANAGEMENT -------------------
 
 // Get all users
@@ -326,7 +327,52 @@ const deleteBooking = async (req, res) => {
     res.status(500).json({ error: "Failed to delete booking" });
   }
 };
+// Delete an approved booking
+const deleteApprovedBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedBooking = await ApprovedBooking.findByIdAndDelete(id);
+    if (!deletedBooking) {
+      return res.status(404).json({ error: "Approved booking not found" });
+    }
+    res.status(200).json({ message: "Approved booking deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting approved booking:", error);
+    res.status(500).json({ error: "Failed to delete approved booking" });
+  }
+};
+// ------------------- REVIEW MANAGEMENT -------------------
+// Get all reviews
+const getAllReviews = async (req, res) => {
+  try {
+    const reviews = await Review.find({})
+      .populate("userId", "name email")          // Optional: populate user info
+      .populate("serviceId", "title");           // Optional: populate service title
+    res.status(200).json({
+      success: true,
+      count: reviews.length,
+      reviews,
+    });
+  } catch (error) {
+    console.error("Error fetching reviews:", error);
+    res.status(500).json({ error: "Failed to fetch reviews" });
+  }
+};
 
+// Delete a review
+const deleteReview = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const review = await Review.findByIdAndDelete(id);
+    if (!review) {
+      return res.status(404).json({ error: "Review not found" });
+    }
+    res.status(200).json({ message: "Review deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    res.status(500).json({ error: "Failed to delete review" });
+  }
+};
 // ------------------- EXPORTS -------------------
 
 module.exports = {
@@ -352,5 +398,8 @@ module.exports = {
   getAllBookingsAdmin,
   getApprovedBookingsAdmin,
   approveBooking,
+  deleteApprovedBooking,
   deleteBooking,
+  getAllReviews,
+  deleteReview
 };

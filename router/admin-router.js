@@ -13,7 +13,10 @@ const {
     getAllBookingsAdmin, 
     getApprovedBookingsAdmin,
     approveBooking,
-    deleteBooking
+    deleteBooking,
+    deleteApprovedBooking,
+    getAllReviews,    
+  deleteReview  
 } = require("../controllers/admin-controller");
 
 // User Management
@@ -38,7 +41,6 @@ router.delete("/approved-workers/:id", authMiddleware, isAdmin, deleteApprovedWo
 
 // Service Management
 router.get("/services", authMiddleware, isAdmin, getServices);
-// In your routes file
 router.post(
     "/services", 
     authMiddleware, 
@@ -54,6 +56,8 @@ router.get("/bookings", authMiddleware, isAdmin, getAllBookingsAdmin);
 router.get("/approved-bookings", authMiddleware, isAdmin, getApprovedBookingsAdmin);
 router.post("/bookings/:id/approve", authMiddleware, isAdmin, approveBooking);
 router.delete("/bookings/:id", authMiddleware, isAdmin, deleteBooking);
+// Delete an approved booking
+router.delete("/approved-bookings/:id", authMiddleware, isAdmin, deleteApprovedBooking);
 
 // Error-handling middleware
 router.use((err, req, res, next) => {
@@ -61,4 +65,7 @@ router.use((err, req, res, next) => {
     res.status(500).json({ message: "Internal Server Error" });
 });
 
+// Review Management (Admin)
+router.get("/reviews", authMiddleware, isAdmin, getAllReviews);
+router.delete("/reviews/:id", authMiddleware, isAdmin, deleteReview);
 module.exports = router;
