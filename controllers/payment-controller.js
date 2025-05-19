@@ -7,13 +7,13 @@ exports.verifyPayment = async (req, res) => {
 
   const config = {
     headers: {
-      Authorization: "cb9963b572a64be9b7664148d8a94da6", // Replace with your secret key
+      Authorization: "key 5f73f9343b964c0ea6823f5326c1cea6", // Replace with your secret key
     },
   };
 
   try {
     const response = await axios.post(
-      "https://a.khalti.com/api/v2/payment/verify/",
+      "https://dev.khalti.com/api/v2/epayment/initiate/",
 
 
       { token, amount },

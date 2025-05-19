@@ -98,6 +98,7 @@ const approveBooking = async (req, res) => {
 
     const booking = await Booking.findById(id)
       .populate("service")
+      .populate('approvedWorker', 'name')
       .session(session);
 
     if (!booking) {
@@ -217,16 +218,41 @@ const getUserBookingHistory = async (req, res) => {
   try {
     const userEmail = req.user.email;
 
-    // Query by nested clientInfo.email field
-    const bookings = await ApprovedBooking.find({ "clientInfo.email": userEmail });
+    // Fetch approved bookings
+    const approvedBookings = await ApprovedBooking.find({ "clientInfo.email": userEmail })
+      .populate("approvedWorker", "name email phone")
+      .populate("service", "title description price");
 
-    return res.status(200).json(bookings);
+    // Fetch pending booking requests (not approved)
+    const pendingBookings = await Booking.find({ 
+      "clientInfo.email": userEmail,
+      isApproved: false 
+    })
+      .populate("service", "title description price");
+
+    // Add a status field to distinguish them on frontend
+    const formattedApproved = approvedBookings.map((b) => ({
+      ...b.toObject(),
+      status: "Approved",
+    }));
+
+    const formattedPending = pendingBookings.map((b) => ({
+      ...b.toObject(),
+      status: "Pending Approval",
+      approvedWorker: null, // no worker assigned yet
+    }));
+
+    // Combine and sort by date descending (you can change sorting logic)
+    const combinedBookings = [...formattedApproved, ...formattedPending].sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
+
+    return res.status(200).json(combinedBookings);
   } catch (error) {
     console.error("Error fetching booking history:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
-
 
 
 module.exports = {
