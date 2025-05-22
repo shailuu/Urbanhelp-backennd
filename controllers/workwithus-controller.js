@@ -23,7 +23,7 @@ const getAllWorkers = async (req, res) => {
     }
 };
 
-// Approve worker by moving data to a new collection
+// Approve worker by moving data to a new collection and deleting from original
 const approveWorker = async (req, res) => {
     try {
         const application = await WorkWithUs.findById(req.params.id);
@@ -43,9 +43,8 @@ const approveWorker = async (req, res) => {
 
         await approved.save();
 
-        // Optionally update the application status
-        application.status = "approved";
-        await application.save();
+        // Delete the original application from the WorkWithUs collection
+        await WorkWithUs.findByIdAndDelete(req.params.id);
 
         return res.status(201).json({ message: "Worker approved successfully" });
     } catch (error) {

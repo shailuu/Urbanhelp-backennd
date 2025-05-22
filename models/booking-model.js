@@ -13,6 +13,11 @@ const bookingSchema = new mongoose.Schema({
     location: { type: String, required: true },
     address: { type: String, required: true },
   },
+   status: {
+    type: String,
+    enum: ["Pending Approval", "Approved", "Cancelled", "Completed", "Payment Pending", "Payment Failed"],
+    default: "Pending Approval",
+  },
   isApproved: { type: Boolean, default: false },
   approvedWorker: { type: mongoose.Schema.Types.ObjectId, ref: "ApprovedWorker" }
 });

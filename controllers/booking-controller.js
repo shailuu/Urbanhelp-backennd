@@ -209,6 +209,7 @@ const approveBooking = async (req, res) => {
     session.endSession();
   }
 };
+
 /**
  * @desc    Get booking history for logged-in user (past bookings only)
  * @route   GET /api/bookings/history/user
@@ -254,10 +255,87 @@ const getUserBookingHistory = async (req, res) => {
   }
 };
 
+/**
+ * @desc    Cancel a booking by the user
+ * @route   PUT /api/bookings/:id/cancel
+ * @access  Private/User
+ */
+const cancelBookingByUser = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const userEmail = req.user.email; // Assuming req.user is populated by authMiddleware
+
+        let booking = null;
+        let approvedBookingRecord = null;
+
+        // Try to find in Booking model first
+        booking = await Booking.findById(id);
+
+        // If not found in Booking, check ApprovedBooking (if it refers back to original booking)
+        if (!booking) {
+            approvedBookingRecord = await ApprovedBooking.findById(id);
+            if (approvedBookingRecord && approvedBookingRecord.originalBookingId) {
+                booking = await Booking.findById(approvedBookingRecord.originalBookingId);
+            }
+        }
+
+        if (!booking || booking.clientInfo.email !== userEmail) {
+            return res.status(403).json({ success: false, message: "Booking not found or you are not authorized to cancel this booking." });
+        }
+
+        if (booking.status === "Cancelled") {
+            return res.status(400).json({ success: false, message: "Booking is already cancelled." });
+        }
+
+        // Update status in original Booking model
+        booking.status = "Cancelled";
+        await booking.save();
+
+        // If an approved booking exists, also update its status
+        if (!approvedBookingRecord) {
+            // If we found the original booking, check if it has an approved counterpart
+            approvedBookingRecord = await ApprovedBooking.findOne({ originalBookingId: booking._id });
+        }
+        if (approvedBookingRecord) {
+            approvedBookingRecord.status = "Cancelled";
+            await approvedBookingRecord.save();
+        }
+
+        // Notify admin about the cancellation (optional but good practice)
+        try {
+            await Notification.create({
+                userEmail: "admin", // Or a specific admin email
+                message: `Booking ID ${booking._id} has been cancelled by the user ${userEmail}.`,
+                relatedEntity: "booking",
+                relatedEntityId: booking._id,
+                metadata: {
+                    userEmail: userEmail,
+                    serviceTitle: booking.service?.title || "unknown service", // Safely access title
+                    bookingDate: booking.date.toISOString(),
+                    bookingTime: booking.time,
+                    status: "Cancelled"
+                },
+            });
+        } catch (notifError) {
+            console.error("Error creating admin cancellation notification:", notifError);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: "Booking cancelled successfully.",
+            booking
+        });
+    } catch (error) {
+        console.error("Error cancelling booking:", error);
+        return res.status(500).json({ success: false, message: "Failed to cancel booking." });
+    }
+};
+
 
 module.exports = {
   createBooking,
   getAllBookings,
   approveBooking,
-  getUserBookingHistory
+  getUserBookingHistory,
+  cancelBookingByUser // Added back to exports
 };

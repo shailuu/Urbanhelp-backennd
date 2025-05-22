@@ -15,10 +15,20 @@ const approvedBookingSchema = new mongoose.Schema({
     location: String,
     address: String,
   },
+  isPaid: {
+    type: Boolean,
+    default: false,
+  },
+  status: {
+    type: String,
+    // Add 'Completed', 'Payment Pending', 'Payment Failed' as required
+    enum: ["Approved", "Completed", "Cancelled", "Payment Pending", "Payment Failed"], // Explicitly list states for ApprovedBooking
+    default: "Approved", // Default to 'Approved' for new approved bookings
+  },
   finalizedAt: {
     type: Date,
     default: Date.now,
   },
-});
+}, { timestamps: true }); 
 
 module.exports = mongoose.model("ApprovedBooking", approvedBookingSchema);

@@ -13,6 +13,8 @@ const servicesRoute = require("./router/services-router");
 const bookingRoute = require("./router/booking-router");
 const adminRoute = require("./router/admin-router");
 const notificationRoute = require("./router/notification-router");
+
+
 // Import review router
 const reviewRoute = require("./router/review-router");
 const path = require('path');
@@ -26,7 +28,7 @@ if (!fs.existsSync(uploadDir)) {
 // Middleware
 app.use(cors({
     origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     credentials: true
 }));
 app.use(express.json());

@@ -7,7 +7,7 @@ exports.verifyPayment = async (req, res) => {
 
   const config = {
     headers: {
-      Authorization: "key 5f73f9343b964c0ea6823f5326c1cea6", // Replace with your secret key
+      Authorization: "key c250e114957747499eb7981e39f48b1a", // Replace with your secret key
     },
   };
 
