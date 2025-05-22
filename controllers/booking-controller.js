@@ -5,13 +5,8 @@ const ApprovedWorker = require("../models/approvedWorker-model");
 const Service = require("../models/service");
 const { sendEmail } = require("../utils/sendEmail");
 const Notification = require("../models/notification-model");
-const { generateBookingApprovalEmail } = require("../utils/emailTemplates");
+const { generateBookingApprovalEmail, generatePaymentConfirmationEmail } = require("../utils/emailTemplates");
 
-/**
- * @desc    Create a new booking
- * @route   POST /api/bookings
- * @access  Public
- */
 const createBooking = async (req, res) => {
   try {
     const { service, duration, charge, date, time, clientInfo } = req.body;
@@ -31,6 +26,8 @@ const createBooking = async (req, res) => {
       time,
       clientInfo,
       isApproved: false,
+      status: "Pending Approval",
+      isPaid: false,
     });
 
     return res.status(201).json({
@@ -48,11 +45,6 @@ const createBooking = async (req, res) => {
   }
 };
 
-/**
- * @desc    Get all bookings
- * @route   GET /api/bookings
- * @access  Private/Admin
- */
 const getAllBookings = async (req, res) => {
   try {
     const bookings = await Booking.find({})
@@ -75,11 +67,6 @@ const getAllBookings = async (req, res) => {
   }
 };
 
-/**
- * @desc    Approve a booking and assign worker
- * @route   POST /api/bookings/:id/approve
- * @access  Private/Admin
- */
 const approveBooking = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -108,13 +95,19 @@ const approveBooking = async (req, res) => {
       });
     }
 
-    if (booking.isApproved) {
+    if (booking.isApproved || booking.status === "Approved") {
       return res.status(400).json({
         success: false,
         message: "Booking is already approved.",
         bookingId: id,
         approvedWorkerId: booking.approvedWorker,
       });
+    }
+    if (booking.status === "Cancelled") {
+        return res.status(400).json({
+            success: false,
+            message: "Cannot approve a cancelled booking.",
+        });
     }
 
     const worker = await ApprovedWorker.findById(approvedWorkerId).session(session);
@@ -135,10 +128,14 @@ const approveBooking = async (req, res) => {
       date: booking.date,
       time: booking.time,
       clientInfo: booking.clientInfo,
+      status: "Approved",
+      isPaid: false,
     });
 
     booking.isApproved = true;
     booking.approvedWorker = worker._id;
+    booking.status = "Approved";
+    booking.isPaid = false;
 
     await approvedBooking.save({ session });
     await booking.save({ session });
@@ -146,12 +143,10 @@ const approveBooking = async (req, res) => {
     await session.commitTransaction();
     committed = true;
 
-    // Extract service title safely
     const serviceTitle = booking.service && typeof booking.service.title === 'string'
       ? booking.service.title
       : 'service';
 
-    // Fire-and-forget email
     sendEmail({
       to: booking.clientInfo.email,
       subject: "Your Booking Has Been Approved",
@@ -160,7 +155,6 @@ const approveBooking = async (req, res) => {
       console.error("[Email Error]:", emailError);
     });
 
-    // Create notification with more detailed metadata
     try {
       await Notification.create({
         userEmail: booking.clientInfo.email,
@@ -173,6 +167,9 @@ const approveBooking = async (req, res) => {
           serviceTitle: serviceTitle,
           bookingDate: booking.date,
           bookingTime: booking.time,
+          charge: booking.charge,
+          bookingId: booking._id,
+          isPaid: false,
         },
       });
       console.log("Notification created successfully");
@@ -210,107 +207,115 @@ const approveBooking = async (req, res) => {
   }
 };
 
-/**
- * @desc    Get booking history for logged-in user (past bookings only)
- * @route   GET /api/bookings/history/user
- * @access  Private/User (user must be authenticated)
- */
 const getUserBookingHistory = async (req, res) => {
   try {
     const userEmail = req.user.email;
 
-    // Fetch approved bookings
-    const approvedBookings = await ApprovedBooking.find({ "clientInfo.email": userEmail })
+    // Fetch all bookings from the 'Booking' model for the user.
+    const allOriginalBookings = await Booking.find({ "clientInfo.email": userEmail })
+      .populate("service", "title description price")
       .populate("approvedWorker", "name email phone")
-      .populate("service", "title description price");
+      .lean();
 
-    // Fetch pending booking requests (not approved)
-    const pendingBookings = await Booking.find({ 
-      "clientInfo.email": userEmail,
-      isApproved: false 
-    })
-      .populate("service", "title description price");
+    // Fetch all entries from the 'ApprovedBooking' model for the user.
+    const allApprovedBookings = await ApprovedBooking.find({ "clientInfo.email": userEmail })
+      .populate("service", "title description price")
+      .populate("approvedWorker", "name email phone")
+      .lean();
 
-    // Add a status field to distinguish them on frontend
-    const formattedApproved = approvedBookings.map((b) => ({
-      ...b.toObject(),
-      status: "Approved",
-    }));
+    const combinedBookingsMap = new Map();
 
-    const formattedPending = pendingBookings.map((b) => ({
-      ...b.toObject(),
-      status: "Pending Approval",
-      approvedWorker: null, // no worker assigned yet
-    }));
+    // 1. Add all bookings from the 'Booking' model first.
+    allOriginalBookings.forEach(booking => {
+        // Use the actual status from the database, or derive if not explicitly set
+        if (!booking.status) {
+            booking.status = booking.isApproved ? "Approved" : "Pending Approval";
+        }
+        combinedBookingsMap.set(booking._id.toString(), {
+            ...booking,
+        });
+    });
 
-    // Combine and sort by date descending (you can change sorting logic)
-    const combinedBookings = [...formattedApproved, ...formattedPending].sort(
+    // 2. Iterate through 'ApprovedBooking' records.
+    // Update existing entries in the map with more definitive status and worker info from ApprovedBooking.
+    allApprovedBookings.forEach(approvedBooking => {
+        const keyId = approvedBooking.originalBookingId ? approvedBooking.originalBookingId.toString() : approvedBooking._id.toString();
+
+        if (combinedBookingsMap.has(keyId)) {
+            const existingBooking = combinedBookingsMap.get(keyId);
+            combinedBookingsMap.set(keyId, {
+                ...existingBooking, // Keep existing fields unless overwritten
+                ...approvedBooking, // Overwrite with details from ApprovedBooking (like approvedWorker, final status)
+                _id: existingBooking._id, // Ensure we keep the original _id as the primary identifier
+                status: approvedBooking.status || "Approved", // IMPORTANT: Use the actual status from ApprovedBooking
+                service: approvedBooking.service || existingBooking.service,
+                approvedWorker: approvedBooking.approvedWorker || existingBooking.approvedWorker,
+            });
+        } else {
+            // If an ApprovedBooking somehow exists without a corresponding original booking, add it.
+            combinedBookingsMap.set(keyId, {
+                ...approvedBooking,
+                status: approvedBooking.status || "Approved"
+            });
+        }
+    });
+
+    const combinedBookings = Array.from(combinedBookingsMap.values()).sort(
       (a, b) => new Date(b.date) - new Date(a.date)
     );
 
     return res.status(200).json(combinedBookings);
   } catch (error) {
-    console.error("Error fetching booking history:", error);
+    console.error("Error fetching user booking history:", error);
     return res.status(500).json({ message: "Server error" });
   }
 };
 
-/**
- * @desc    Cancel a booking by the user
- * @route   PUT /api/bookings/:id/cancel
- * @access  Private/User
- */
 const cancelBookingByUser = async (req, res) => {
     try {
         const { id } = req.params;
-        const userEmail = req.user.email; // Assuming req.user is populated by authMiddleware
+        const userEmail = req.user.email;
 
-        let booking = null;
-        let approvedBookingRecord = null;
+        let booking = await Booking.findById(id);
 
-        // Try to find in Booking model first
-        booking = await Booking.findById(id);
-
-        // If not found in Booking, check ApprovedBooking (if it refers back to original booking)
         if (!booking) {
-            approvedBookingRecord = await ApprovedBooking.findById(id);
-            if (approvedBookingRecord && approvedBookingRecord.originalBookingId) {
-                booking = await Booking.findById(approvedBookingRecord.originalBookingId);
+            const approvedBookingById = await ApprovedBooking.findById(id);
+            if (approvedBookingById && approvedBookingById.originalBookingId) {
+                booking = await Booking.findById(approvedBookingById.originalBookingId);
+                if (!booking || booking.clientInfo.email !== userEmail) {
+                    return res.status(403).json({ success: false, message: "You are not authorized to cancel this booking." });
+                }
+            } else {
+                return res.status(404).json({ success: false, message: "Booking not found." });
             }
         }
 
-        if (!booking || booking.clientInfo.email !== userEmail) {
-            return res.status(403).json({ success: false, message: "Booking not found or you are not authorized to cancel this booking." });
+        if (booking.clientInfo.email !== userEmail) {
+            return res.status(403).json({ success: false, message: "You are not authorized to cancel this booking." });
         }
 
         if (booking.status === "Cancelled") {
             return res.status(400).json({ success: false, message: "Booking is already cancelled." });
         }
 
-        // Update status in original Booking model
         booking.status = "Cancelled";
         await booking.save();
 
-        // If an approved booking exists, also update its status
-        if (!approvedBookingRecord) {
-            // If we found the original booking, check if it has an approved counterpart
-            approvedBookingRecord = await ApprovedBooking.findOne({ originalBookingId: booking._id });
-        }
+        const approvedBookingRecord = await ApprovedBooking.findOne({ originalBookingId: booking._id });
         if (approvedBookingRecord) {
             approvedBookingRecord.status = "Cancelled";
             await approvedBookingRecord.save();
         }
 
-        // Notify admin about the cancellation (optional but good practice)
         try {
             await Notification.create({
-                userEmail: "admin", // Or a specific admin email
+                userEmail: "admin",
                 message: `Booking ID ${booking._id} has been cancelled by the user ${userEmail}.`,
                 relatedEntity: "booking",
                 relatedEntityId: booking._id,
                 metadata: {
                     userEmail: userEmail,
-                    serviceTitle: booking.service?.title || "unknown service", // Safely access title
+                    serviceTitle: booking.service?.title || "unknown service",
                     bookingDate: booking.date.toISOString(),
                     bookingTime: booking.time,
                     status: "Cancelled"
@@ -331,11 +336,62 @@ const cancelBookingByUser = async (req, res) => {
     }
 };
 
+const handleKhaltiPaymentSuccess = async (req, res) => {
+  const { pidx, transaction_id, purchase_order_id, amount, status } = req.query;
+
+  if (status !== 'Completed') {
+    console.error(`Khalti payment not completed for order ${purchase_order_id}. Status: ${status}`);
+    return res.redirect(`http://localhost:3000/payment-status?success=false&orderId=${purchase_order_id}&status=${status}`);
+  }
+
+  try {
+    const bookingId = purchase_order_id;
+
+    const booking = await Booking.findById(bookingId);
+    if (!booking) {
+      console.error(`Booking not found for purchase_order_id: ${bookingId}`);
+      return res.redirect(`http://localhost:3000/payment-status?success=false&message=Booking not found&orderId=${bookingId}`);
+    }
+
+    booking.status = 'Completed';
+    booking.isPaid = true;
+    await booking.save();
+
+    const approvedBookingRecord = await ApprovedBooking.findOne({ originalBookingId: booking._id });
+    if (approvedBookingRecord) {
+      approvedBookingRecord.status = 'Completed';
+      approvedBookingRecord.isPaid = true;
+      await approvedBookingRecord.save();
+    }
+
+    await Notification.updateMany(
+      { relatedEntity: "booking", relatedEntityId: booking._id },
+      { $set: { "metadata.isPaid": true } }
+    );
+
+    await booking.populate("service").populate("approvedWorker");
+    sendEmail({
+      to: booking.clientInfo.email,
+      subject: "Payment Confirmed & Thank You for Your Booking!",
+      html: generatePaymentConfirmationEmail(booking, transaction_id),
+    }).catch((emailError) => {
+      console.error("[Payment Confirmation Email Error]:", emailError);
+    });
+
+    return res.redirect(`http://localhost:3000/payment-status?success=true&orderId=${bookingId}&transactionId=${transaction_id}`);
+
+  } catch (error) {
+    console.error("[Khalti Payment Success Handler Error]:", error);
+    return res.redirect(`http://localhost:3000/payment-status?success=false&message=Server error during payment confirmation&orderId=${purchase_order_id}`);
+  }
+};
+
 
 module.exports = {
   createBooking,
   getAllBookings,
   approveBooking,
   getUserBookingHistory,
-  cancelBookingByUser // Added back to exports
+  cancelBookingByUser,
+  handleKhaltiPaymentSuccess,
 };
