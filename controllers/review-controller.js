@@ -35,7 +35,7 @@ const createReview = async (req, res) => {
             return res.status(400).json({ message: "You have already reviewed this service." });
         }
 
-        // 📝 Create new review
+        //  Create new review
         const newReview = new Review({
             serviceId: id,
             userId,
@@ -48,7 +48,7 @@ const createReview = async (req, res) => {
         res.status(201).json(savedReview);
 
     } catch (error) {
-        // 💥 Handle MongoDB duplicate key error (in case of race condition)
+        // Handle duplicate review error
         if (error.code === 11000) {
             return res.status(400).json({ message: "You have already reviewed this service." });
         }
@@ -58,7 +58,7 @@ const createReview = async (req, res) => {
     }
 };
 
-// ✅ Add this function:
+
 const checkUserReview = async (req, res) => {
     const { id } = req.params; // serviceId
     const userId = req.user.id;

@@ -17,7 +17,7 @@ const serviceSchema = new mongoose.Schema(
             required: true,
         },
         additionalDetails: {
-            type: String,  // Optional field for extra service details
+            type: String,  
             trim: true,
         },
         durations: [

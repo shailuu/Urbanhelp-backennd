@@ -271,9 +271,7 @@ const forgotPassword = async (req, res, next) => {
         next(error);
     }
 };
-// controllers/auth-controller.js (add this)
 
-// Update this in controllers/auth-controller.js
 const resetPassword = async (req, res, next) => {
     try {
         const { email, otp, newPassword } = req.body;
@@ -314,7 +312,7 @@ const resetPassword = async (req, res, next) => {
     }
 };
 
-// controllers/auth-controller.js
+
 
 const deleteAccount = async (req, res, next) => {
     try {
@@ -327,7 +325,7 @@ const deleteAccount = async (req, res, next) => {
             return res.status(404).json({ message: "User not found." });
         }
 
-        // Optionally, you can perform additional cleanup here (e.g., delete related data)
+        
 
         res.status(200).json({ message: "Account deleted successfully." });
     } catch (error) {
@@ -352,5 +350,5 @@ module.exports = {
     forgotPassword,
     resetPassword,
     sendPasswordResetEmail ,
-    deleteAccount// Add this if you defined it in the controller file
-};
+    deleteAccount
+}

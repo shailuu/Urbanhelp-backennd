@@ -8,6 +8,7 @@ const {
   approveBooking, // Make sure this is correctly imported
   getUserBookingHistory,
   cancelBookingByUser,
+  updateBookingPaymentStatus,
 } = require("../controllers/booking-controller"); // Path to your controller
 const { authMiddleware } = require("../middlewares/auth-middleware");
 
@@ -17,4 +18,6 @@ router.get("/", getAllBookings); // GET to fetch all bookings
 router.post("/:id/approve", approveBooking); // POST to approve a booking
 router.get('/history/user', authMiddleware, getUserBookingHistory);
 router.patch("/:id/cancel", authMiddleware, cancelBookingByUser);
+router.put("/admin/:id/payment-status", updateBookingPaymentStatus);
+
 module.exports = router;

@@ -15,6 +15,7 @@ const {
     approveBooking,
     deleteBooking,
     deleteApprovedBooking,
+    updateApprovedBookingPaymentStatus,
     getAllReviews,    
   deleteReview  
 } = require("../controllers/admin-controller");
@@ -56,6 +57,12 @@ router.get("/bookings", authMiddleware, isAdmin, getAllBookingsAdmin);
 router.get("/approved-bookings", authMiddleware, isAdmin, getApprovedBookingsAdmin);
 router.post("/bookings/:id/approve", authMiddleware, isAdmin, approveBooking);
 router.delete("/bookings/:id", authMiddleware, isAdmin, deleteBooking);
+router.put(
+    "/approved-bookings/:id/payment-status", // This matches your frontend API call
+    authMiddleware,
+    isAdmin, // Ensure only admins can update payment status
+    updateApprovedBookingPaymentStatus
+);
 // Delete an approved booking
 router.delete("/approved-bookings/:id", authMiddleware, isAdmin, deleteApprovedBooking);
 
